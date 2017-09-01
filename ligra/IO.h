@@ -148,10 +148,11 @@ graph<vertex> readGraphFromFile(char* fname, bool isSymmetric) {
     cout << "Bad input file" << endl;
     abort();
   }
-
+  
   long len = W.m -1;
   long n = atol(W.Strings[1]);
   long m = atol(W.Strings[2]);
+
 #ifndef WEIGHTED
   if (len != n + m + 2) {
 #else
@@ -507,4 +508,180 @@ graph<vertex> readCompressedGraph(char* fname, bool isSymmetric) {
 
   graph<vertex> G(V,n,m,mem);
   return G;
-}
+ }
+
+ template <class intE>
+   graphExt<intE> readGraphExtFromFile(char* fname) {
+   _seq<char> S = readStringFromFile(fname);
+   words W = stringToWords(S.A, S.n);
+   if (W.Strings[0] != (string) "AdjacencyGraph") {
+     cout << "Bad input file: missing header 'AdjGraphHeader'" << endl;
+     abort();
+   }
+   
+   long len = W.m -1;
+   uintT * In = newA(uintT, len);
+   {parallel_for(long i=0; i < len; i++) In[i] = atol(W.Strings[i + 1]);}
+   //W.del(); // to deal with performance bug in malloc
+   
+   long n = In[0];
+   long m = In[1];
+   
+   if (len != n + m + 2) {
+     cout << "Bad input file: length = "<<len<< " n+m+2 = " << n+m+2 << endl;
+     abort();
+   }
+   vertexExt<intE> *v = newA(vertexExt<intE>,n);
+   edgeExt<intE> *e = newA(edgeExt<intE>,m);
+   uintE* offsets = In+2;
+   uintE* edges = In+2+n;
+    
+   parallel_for (long i=0; i < n; i++) {
+     uintE o = offsets[i];
+     uintE l = ((i == n-1) ? m : offsets[i+1])-o;
+     v[i].neighbors = o;
+     for (uintT j=o; j<o+l; j++) {
+       e[j].u = (intE)i;
+       e[j].v = *(edges+j);
+       e[j].cmp = -1;
+      }
+   }
+    
+    for(long i = 0; i < m; i++) {
+      uintE pos_tgt = e[i].v;
+      vertexExt<intE> target = v[pos_tgt];
+      int cmp = -1;
+      
+      if(e[i].cmp != -1)
+        continue;
+      
+      uintE ll = target.neighbors;
+      uintE ul = ((pos_tgt == n-1) ? m : v[pos_tgt+1].neighbors);
+      for(uintT j = ll; j < ul; j++) {
+        /* To support multiple edges among two vertices, we choose the last */
+        /* unvisited (e.cmp=-1) edge, not the first one */
+        if((e[j].cmp == -1) && (e[j].v == e[i].u) && (i != j))
+          cmp = j;
+      }
+      
+      if(cmp != -1) {
+        e[i].cmp = cmp;
+        e[cmp].cmp = i;
+      }
+    }
+    
+    delete In;
+    return graphExt<intE>(v,e,n,m);
+ }
+
+
+ /////////////////////////////
+
+
+ /* NOTE: Copied from https://people.eecs.berkeley.edu/~jshun/connectedComponents.tar */
+ inline int xToStringLen(long a) { return 21;}
+ inline void xToString(char* s, long a) { sprintf(s,"%ld",a);}
+ 
+ inline int xToStringLen(unsigned long a) { return 21;}
+ inline void xToString(char* s, unsigned long a) { sprintf(s,"%lu",a);}
+ 
+ inline uint xToStringLen(uint a) { return 12;}
+ inline void xToString(char* s, uint a) { sprintf(s,"%u",a);}
+ 
+ inline int xToStringLen(int a) { return 12;}
+ inline void xToString(char* s, int a) { sprintf(s,"%d",a);}
+ 
+ inline int xToStringLen(double a) { return 18;}
+ inline void xToString(char* s, double a) { sprintf(s,"%.11le", a);}
+
+ inline int xToStringLen(char* a) { return strlen(a)+1;}
+ inline void xToString(char* s, char* a) { sprintf(s,"%s",a);}
+ 
+ 
+ template <class A, class B>
+  inline int xToStringLen(pair<A,B> a) { 
+    return xToStringLen(a.first) + xToStringLen(a.second) + 1;
+  }
+  template <class A, class B>
+  inline void xToString(char* s, pair<A,B> a) { 
+    int l = xToStringLen(a.first);
+    xToString(s,a.first);
+    s[l] = ' ';
+    xToString(s+l+1,a.second);
+  }
+
+  struct notZero { bool operator() (char A) {return A > 0;}};
+
+
+  template <class T>
+  _seq<char> arrayToString(T* A, long n) {
+    long* L = newA(long,n);
+    {parallel_for(long i=0; i < n; i++) L[i] = xToStringLen(A[i])+1;}
+    long m = sequence::scan(L,L,n,addF<long>(),(long) 0);
+    char* B = newA(char,m);
+    parallel_for(long j=0; j < m; j++) 
+      B[j] = 0;
+    parallel_for(long i=0; i < n-1; i++) {
+      xToString(B + L[i],A[i]);
+      B[L[i+1] - 1] = '\n';
+    }
+    xToString(B + L[n-1],A[n-1]);
+    B[m-1] = '\n';
+    free(L);
+    char* C = newA(char,m+1);
+    long mm = sequence::filter(B,C,m,notZero());
+    C[mm] = 0;
+    free(B);
+    return _seq<char>(C,mm);
+  }
+
+  template <class T>
+  void writeArrayToStream(ofstream& os, T* A, long n) {
+    long BSIZE = 1000000;
+    long offset = 0;
+    while (offset < n) {
+      // Generates a string for a sequence of size at most BSIZE
+      // and then wrties it to the output stream
+      _seq<char> S = arrayToString(A+offset,min(BSIZE,n-offset));
+      os.write(S.A, S.n);
+      S.del();
+      offset += BSIZE;
+    }    
+  }
+
+  template <class T>
+    int writeArrayToFile(string header, T* A, long n, char* fileName) {
+    ofstream file (fileName, ios::out | ios::binary);
+    if (!file.is_open()) {
+      std::cout << "Unable to open file: " << fileName << std::endl;
+      return 1;
+    }
+    file << header << endl;
+    writeArrayToStream(file, A, n);
+    file.close();
+    return 0;
+  }
+
+ template <class vertex>
+   int writeGraphToFile(graph<vertex> G, char* fname) {
+   long m = G.m;
+   long n = G.n;
+   long totalLen = 2 + n + m;
+   intT *Out = newA(intT, totalLen);
+   Out[0] = n;
+   Out[1] = m;
+   parallel_for (intT i=0; i < n; i++) {
+     Out[i+2] = G.V[i].degree;
+   }
+   intT total = sequence::scan(Out+2,Out+2,n,addF<intT>(),(intT)0);
+   for (intT i=0; i < n; i++) {
+     intT *O = Out + (2 + n + Out[i+2]);
+     symmetricVertex v = G.V[i];
+     for (intT j = 0; j < v.degree; j++) 
+       O[j] = v.neighbors[j];
+   }
+   int r = writeArrayToFile("AdjacencyGraph", Out, totalLen, fname);
+   free(Out);
+   return r;
+  }
+ 

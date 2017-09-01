@@ -45,4 +45,55 @@ graph(vertex* VV, long nn, long mm, Deletable* DD, uintE* _flags) : V(VV), n(nn)
     }
   }
 };
+
+// **************************************************************
+//  EXTENDED ADJACENCY ARRAY REPRESENTATION
+// **************************************************************
+
+template <class intE>
+struct vertexExt {
+  intE neighbors;
+  void del() {free(neighbors);}
+  vertexExt(intE N) : neighbors(N) {}
+};
+
+template <class intE>
+struct edgeExt {
+  intE u;
+  intE v;
+  intE cmp;
+  edgeExt(intE f, intE s) : u(f), v(s), cmp(0) {}
+  edgeExt(intE f, intE s, intE c) : u(f), v(s), cmp(c) {}
+};
+
+template <class intE>
+struct graphExt {
+  vertexExt<intE> *V;
+  edgeExt<intE> *E;
+  long n;
+  long m;
+  graphExt(vertexExt<intE>* VV, edgeExt<intE>* EE, long nn, long mm) 
+    : V(VV), E(EE), n(nn), m(mm) {}
+  graphExt(vertexExt<intE>* VV, long nn, long mm) 
+    : V(VV), E(NULL), n(nn), m(mm) {}
+  vertexExt<intE>* vertices() { return V; }
+  edgeExt<intE> * edges() { return E; }
+  graphExt copy() {
+    vertexExt<intE>* VN = newA(vertexExt<intE>,n);
+    edgeExt<intE>* EN = newA(edgeExt<intE>,m);
+    for (long i=0; i < n; i++)
+      VN[i].neighbors = V[i].neighbors;
+    for (long i=0; i < m; i++) {
+      EN[i].u = E[i].u;
+      EN[i].v = E[i].v;
+      EN[i].cmp = E[i].cmp;
+    }
+    return graphExt(VN, EN, n, m);
+  }
+  void del() {
+    free(V);
+    free(E);
+  }
+};
+
 #endif

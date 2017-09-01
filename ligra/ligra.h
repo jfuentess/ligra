@@ -118,7 +118,14 @@ vertexSubset edgeMap(graph<vertex> GA, vertexSubset &V, F f, intT threshold = -1
     }}
   uintT outDegrees = sequence::plusReduce(degrees, m);
   if (outDegrees == 0) return vertexSubset(numVertices);
-  if (m + outDegrees > threshold) { 
+
+#ifdef CO
+  bool canonical = 1;
+#else
+  bool canonical = 0;
+#endif
+  
+  if (m + outDegrees > threshold && !canonical) { 
     V.toDense();
     free(degrees);
     free(frontierVertices);
@@ -176,61 +183,61 @@ inline bool cond_true (intT d) { return 1; }
 template<class vertex>
 void Compute(graph<vertex>&, commandLine);
 
-int parallel_main(int argc, char* argv[]) {
-  commandLine P(argc,argv," [-s] <inFile>");
-  char* iFile = P.getArgument(0);
-  bool symmetric = P.getOptionValue("-s");
-  bool compressed = P.getOptionValue("-c");
-  bool binary = P.getOptionValue("-b");
-  long rounds = P.getOptionLongValue("-rounds",3);
-  if (compressed) {
-    if (symmetric) {
-      graph<compressedSymmetricVertex> G =
-        readCompressedGraph<compressedSymmetricVertex>(iFile,symmetric); //symmetric graph
-      Compute(G,P);
-      for(int r=0;r<rounds;r++) {
-        startTime();
-        Compute(G,P);
-        nextTime("Running time");
-      }
-      G.del();
-    } else {
-      graph<compressedAsymmetricVertex> G =
-        readCompressedGraph<compressedAsymmetricVertex>(iFile,symmetric); //asymmetric graph
-      Compute(G,P);
-      if(G.transposed) G.transpose();
-      for(int r=0;r<rounds;r++) {
-        startTime();
-        Compute(G,P);
-        nextTime("Running time");
-        if(G.transposed) G.transpose();
-      }
-      G.del();
-    }
-  } else {
-    if (symmetric) {
-      graph<symmetricVertex> G =
-        readGraph<symmetricVertex>(iFile,compressed,symmetric,binary); //symmetric graph
-      Compute(G,P);
-      for(int r=0;r<rounds;r++) {
-        startTime();
-        Compute(G,P);
-        nextTime("Running time");
-      }
-      G.del();
-    } else {
-      graph<asymmetricVertex> G =
-        readGraph<asymmetricVertex>(iFile,compressed,symmetric,binary); //asymmetric graph
-      Compute(G,P);
-      if(G.transposed) G.transpose();
-      for(int r=0;r<rounds;r++) {
-        startTime();
-        Compute(G,P);
-        nextTime("Running time");
-        if(G.transposed) G.transpose();
-      }
-      G.del();
-    }
-  }
-}
+/* int parallel_main(int argc, char* argv[]) { */
+/*   commandLine P(argc,argv," [-s] <inFile>"); */
+/*   char* iFile = P.getArgument(0); */
+/*   bool symmetric = P.getOptionValue("-s"); */
+/*   bool compressed = P.getOptionValue("-c"); */
+/*   bool binary = P.getOptionValue("-b"); */
+/*   long rounds = P.getOptionLongValue("-rounds",3); */
+/*   if (compressed) { */
+/*     if (symmetric) { */
+/*       graph<compressedSymmetricVertex> G = */
+/*         readCompressedGraph<compressedSymmetricVertex>(iFile,symmetric); //symmetric graph */
+/*       Compute(G,P); */
+/*       for(int r=0;r<rounds;r++) { */
+/*         startTime(); */
+/*         Compute(G,P); */
+/*         nextTime("Running time"); */
+/*       } */
+/*       G.del(); */
+/*     } else { */
+/*       graph<compressedAsymmetricVertex> G = */
+/*         readCompressedGraph<compressedAsymmetricVertex>(iFile,symmetric); //asymmetric graph */
+/*       Compute(G,P); */
+/*       if(G.transposed) G.transpose(); */
+/*       for(int r=0;r<rounds;r++) { */
+/*         startTime(); */
+/*         Compute(G,P); */
+/*         nextTime("Running time"); */
+/*         if(G.transposed) G.transpose(); */
+/*       } */
+/*       G.del(); */
+/*     } */
+/*   } else { */
+/*     if (symmetric) { */
+/*       graph<symmetricVertex> G = */
+/*         readGraph<symmetricVertex>(iFile,compressed,symmetric,binary); //symmetric graph */
+/*       Compute(G,P); */
+/*       for(int r=0;r<rounds;r++) { */
+/*         startTime(); */
+/*         Compute(G,P); */
+/*         nextTime("Running time"); */
+/*       } */
+/*       G.del(); */
+/*     } else { */
+/*       graph<asymmetricVertex> G = */
+/*         readGraph<asymmetricVertex>(iFile,compressed,symmetric,binary); //asymmetric graph */
+/*       Compute(G,P); */
+/*       if(G.transposed) G.transpose(); */
+/*       for(int r=0;r<rounds;r++) { */
+/*         startTime(); */
+/*         Compute(G,P); */
+/*         nextTime("Running time"); */
+/*         if(G.transposed) G.transpose(); */
+/*       } */
+/*       G.del(); */
+/*     } */
+/*   } */
+/* } */
 #endif

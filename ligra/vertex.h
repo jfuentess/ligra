@@ -5,15 +5,19 @@ using namespace std;
 
 namespace decode_uncompressed {
   template <class V, class F>
-  inline void decodeInNghBreakEarly(V* v, long i, bool* vertexSubset, F &f, bool* next, bool parallel = 0) {
+  inline void decodeInNghBreakEarly(V* v, long i, bool* vertexSubset, F &f,
+				    bool* next, bool parallel = 0) {
     uintE d = v->getInDegree();
     if (!parallel || d < 1000) {
       for (uintE j=0; j<d; j++) {
         uintE ngh = v->getInNeighbor(j);
-#ifndef WEIGHTED
-        if (vertexSubset[ngh] && f.update(ngh,i))
-#else
+	cout << "(" << ngh << "," << j << ")"<< endl;
+#ifdef WEIGHTED
         if (vertexSubset[ngh] && f.update(ngh,i,v->getInWeight(j)))
+#elif CO
+	  if (vertexSubset[ngh] && f.updateAtomic(ngh,i, j))
+#else
+        if (vertexSubset[ngh] && f.update(ngh,i))
 #endif
           next[i] = 1;
         if(!f.cond(i)) break;
@@ -21,10 +25,12 @@ namespace decode_uncompressed {
     } else {
       parallel_for(uintE j=0; j<d; j++) {
         uintE ngh = v->getInNeighbor(j);
-#ifndef WEIGHTED
-        if (vertexSubset[ngh] && f.updateAtomic(ngh,i))
-#else
+#ifdef WEIGHTED
         if (vertexSubset[ngh] && f.updateAtomic(ngh,i,v->getInWeight(j)))
+#elif CO
+	  if (vertexSubset[ngh] && f.updateAtomic(ngh,i, j))
+#else
+        if (vertexSubset[ngh] && f.updateAtomic(ngh,i))
 #endif
           next[i] = 1;
       }
@@ -37,20 +43,24 @@ namespace decode_uncompressed {
     if(d < 1000) {
       for(uintE j=0; j<d; j++) {
         uintE ngh = v->getOutNeighbor(j);
-#ifndef WEIGHTED
-        if (f.cond(ngh) && f.updateAtomic(i,ngh))
-#else 
-        if (f.cond(ngh) && f.updateAtomic(i,ngh,v->getOutWeight(j))) 
+#ifdef WEIGHTED
+        if (f.cond(ngh) && f.updateAtomic(i,ngh,v->getOutWeight(j)))
+#elif CO 
+	  if (f.cond(ngh) && f.updateAtomic(i,ngh,j)) 
+#else
+	if (f.cond(ngh) && f.updateAtomic(i,ngh))
 #endif
           next[ngh] = 1;
       }
     } else {
       parallel_for(uintE j=0; j<d; j++) {
         uintE ngh = v->getOutNeighbor(j);
-#ifndef WEIGHTED
-        if (f.cond(ngh) && f.updateAtomic(i,ngh)) 
+#ifdef WEIGHTED
+	if (f.cond(ngh) && f.updateAtomic(i,ngh,v->getOutWeight(j)))
+#elif CO // Canonical ordering
+        if (f.cond(ngh) && f.updateAtomic(i,ngh, j))
 #else
-          if (f.cond(ngh) && f.updateAtomic(i,ngh,v->getOutWeight(j)))
+        if (f.cond(ngh) && f.updateAtomic(i,ngh))
 #endif
         next[ngh] = 1;
       }
@@ -63,10 +73,13 @@ namespace decode_uncompressed {
     if(d < 1000) {
       for (uintE j=0; j < d; j++) {
         uintE ngh = v->getOutNeighbor(j);
-#ifndef WEIGHTED
-        if(f.cond(ngh) && f.updateAtomic(i,ngh)) 
-#else
+#ifdef WEIGHTED
         if(f.cond(ngh) && f.updateAtomic(i,ngh,v->getOutWeight(j)))
+#elif CO // Canonical ordering
+	  if (f.cond(ngh) && f.updateAtomic(i,ngh, j))
+	    //	  if (f.cond(ngh) && f.updateAtomic(i,ngh))
+#else
+        if(f.cond(ngh) && f.updateAtomic(i,ngh)) 
 #endif
           outEdges[o+j] = ngh;
         else outEdges[o+j] = UINT_E_MAX;
@@ -74,10 +87,12 @@ namespace decode_uncompressed {
     } else {
       parallel_for (uintE j=0; j < d; j++) {
         uintE ngh = v->getOutNeighbor(j);
-#ifndef WEIGHTED
-        if(f.cond(ngh) && f.updateAtomic(i,ngh)) 
-#else
+#ifdef WEIGHTED
         if(f.cond(ngh) && f.updateAtomic(i,ngh,v->getOutWeight(j)))
+#elif CO // Canonical ordering
+	  if (f.cond(ngh) && f.updateAtomic(i,ngh, j))
+#else
+        if(f.cond(ngh) && f.updateAtomic(i,ngh)) 
 #endif
           outEdges[o+j] = ngh;
         else outEdges[o+j] = UINT_E_MAX;
